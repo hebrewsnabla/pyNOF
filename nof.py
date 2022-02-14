@@ -8,6 +8,7 @@ class PNOF():
 
     def __init__(self, _hf):
         self._hf = _hf
+        self.mol = _hf.mol
         self.mo_coeff = _hf.mo_coeff
         self.mo_occ = _hf.mo_occ / 2.0
         self.max_memory = 2000
@@ -35,6 +36,9 @@ class PNOF():
         e0 += self._hf.energy_nuc()
         print('PNOF5(GVB) energy %.6f' % e0)
 
+        get_grad(self, self.mo_occ, mo, h_mo, self.ncore, self.npair, self.nopen, Delta, Pi)
+        
+        
     def ao2mo(self):
         mo = self.mo_coeff
         #if self._scf._eri is not None:
@@ -44,7 +48,7 @@ class PNOF():
         #    eri = ao2mo.full(self.mol, mo_coeff, verbose=self.verbose,
         #                     max_memory=self.max_memory)
         #if self._hf._eri is None:
-        _eri = self._hf.mol.intor('int2e')
+        _eri = self.mol.intor('int2e')
         #else:
         #    _eri = self._hf._eri
         print(_eri.shape, mo.shape)
@@ -80,3 +84,26 @@ def get_DP(f, ncore, npair, nopen):
     #print(Delta[:15,:15])
     #print(Pi[:15,:15])
     return Delta, Pi
+
+def get_grad(nof, f, mo, h_mo, ncore, npair, nopen, Delta, Pi):
+    occ = ncore + 2*npair + nopen
+    mo_o = mo[:,:occ]
+    mo_v = mo[:,occ:]
+    a = 2*einsum('q,p->qp', f, f) - 2*Delta
+    b = -einsum('q,p->qp', f, f) + Delta + Pi
+    df = f[:occ, None] - f[None, :occ]
+    a = a[:occ,:occ]
+    b = b[:occ,:occ]
+    da = np.expand_dims(a, axis=1) - np.expand_dims(a, axis=0)
+    db = np.expand_dims(b, axis=1) - np.expand_dims(b, axis=0)
+    print(df.shape, da.shape)
+    _eri = nof.mol.intor('int2e')
+    eri1 = ao2mo.general(_eri, (mo_o, mo_o, mo_o, mo_o), max_memory=nof.max_memory)
+    print(eri1.shape)
+    eri2 = ao2mo.general(_eri, (mo_o, mo_v, mo_o, mo_o), max_memory=nof.max_memory)
+    goo = einsum('qp,pq->pq', df, h_mo[:occ,:occ]) + einsum('qpk,pqkk->pq', da, eri1) + einsum('qpk,pkqk->pq', db, eri1)
+    gov = einsum('q,pq->pq', f[:occ], h_mo[occ:,:occ]) +  einsum('qk,qpkk->pq', a, eri2) + einsum('qk,kpkq->pq', b, eri2)
+    print(goo)
+    print(gov)
+
+def gen_g_hop(mf, mo, mo_occ):
