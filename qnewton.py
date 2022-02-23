@@ -47,8 +47,10 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
     #Xmin, Xmax = Xrange
     E = getE(X)
     f, hdiag = getf(X)
-    print('cycle    maxq     dE    maxg')
-    print("   0                   %.4f"% abs(f).max())
+    print('cycle     maxq      dE      maxg')
+    print("   0                       %.6f"% abs(f).max())
+    if np.dot(f.T, f) < 1e-10 :
+        return X
     nx = len(X)
     oldE = E
     oldX = copy.copy(X)
@@ -64,7 +66,8 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
         E = getE(X)
         f, hdiag = getf(X)
         dE = E - oldE
-        if E > oldE:
+        #print(dE)
+        if dE > 1e-4:
             print("reset alpha")
             oldalpha /= 2
         else:
@@ -121,7 +124,7 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
             G = oldG + aa*np.einsum('i,j->ij',U, U)
             alpha = 1
     
-        if np.dot(f.T, f) < 1e-10:
+        if np.dot(f.T, f) < 1e-10 and abs(q).max() < 1e-5:
             break
         else:
             cyc += 1
@@ -131,6 +134,6 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
     return X
 
 def dump_cyc(cyc, q, dE, f):
-    print("  %2d    %.4f %.4f %.4f "%(cyc, abs(q).max(), dE, abs(f).max()))
+    print("  %2d    %.6f %.6f %.6f "%(cyc, abs(q).max(), dE, abs(f).max()))
 '''
 '''

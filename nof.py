@@ -1,4 +1,6 @@
 from pyscf import lib, ao2mo, scf
+from pyscf.mcscf.mc1step import expmat, CASSCF
+from pyscf.soscf import ciah
 import numpy as np
 from automr.autocas import check_uno
 from automr.dump_mat import dump_mo
@@ -12,7 +14,7 @@ class PNOF():
         self._hf = _hf
         self.mol = _hf.mol
         self.mo_coeff = _hf.mo_coeff
-        self.mo_occ = _hf.mo_occ / 2.0
+        self.mo_occ = None #_hf.mo_occ / 2.0
         self.max_memory = 2000
 
         self.ncore = None
@@ -24,34 +26,78 @@ class PNOF():
         self.nmo = None
         print('\n******** %s ********' % self.__class__)
 
-    def kernel(self):
-        mo = self.mo_coeff
+    def kernel(self, mo=None):
+        if mo is None:
+            mo = self.mo_coeff
+        else:
+            self.mo_coeff = mo
+        #dump_mo(self.mol, mo[:,:12])
+        #if self.sorting == 'gau':
+        #    mo = rearrange(mo, self.ncore, self.npair)
+        #dump_mo(self.mol, mo[:,:12])
         #self.nopen = 
-        nact, ncore, nex = check_uno(self.mo_occ*2, 1.99999)
-        print('ncore %d nact %d nex %d' % (ncore, nact, nex))
-        #exit()
-        self.ncore = ncore
-        self.npair = (nact - self.nopen)//2
-        print('occ', self.mo_occ[:ncore+nact])
-        Delta, Pi = get_DP(self.mo_occ, self.ncore, self.npair, self.nopen)
+        nmo = mo.shape[-1]
+        if self.npair is None:
+            nact, ncore, nex = check_uno(self.mo_occ*2, 1.99999)
+            print('ncore %d nact %d nex %d' % (ncore, nact, nex))
+            #exit()
+            self.ncore = ncore
+            self.npair = (nact - self.nopen)//2
+        else:
+            ncore = self.ncore
+            npair = self.npair
+            nact = npair*2
         h_mo = h1e(self._hf, mo)
-        J,K = self.ao2mo()
-        e0 = energy_elec(self.mo_occ, h_mo, J, K, Delta, Pi)
-        e0 += self._hf.energy_nuc()
-        print('PNOF5(GVB) energy %.6f' % e0)
-        
+        J,K = self.ao2mo(mo)
+        if self.mo_occ is None:
+            guess = np.ones(self.npair)*0.9
+            #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
+            #guess = (np.arctan(np.arange(63.1, 0.0, -63/(self.npair-1)))+1)/2
+        else:
+            guess = self.mo_occ[ncore:ncore+npair]
         ao_ovlp = self.mol.intor_symmetric('int1e_ovlp')
-        guess = np.ones(self.npair)*0.9
-        guess = np.arange(0.99, 0.5, -0.48/(self.npair-1))
         new_occ = get_occ(self, mo, ao_ovlp, self.ncore, self.npair, self.nopen, guess,
                           h_mo, J, K)
         print('intrinsic occ', new_occ[:ncore+nact])
-
-        get_grad(self, self.mo_occ, mo, h_mo, self.ncore, self.npair, self.nopen, Delta, Pi)
+        self.mo_occ = new_occ
+        #print('occ', self.mo_occ[:ncore+nact])
+        Delta, Pi = get_DP(self.mo_occ, self.ncore, self.npair, self.nopen)
+        
+        e_elec = energy_elec(self.mo_occ, h_mo, J, K, Delta, Pi)
+        e0 = e_elec + self._hf.energy_nuc()
+        print('PNOF5(GVB) energy %.6f' % e0)
         
         
-    def ao2mo(self):
-        mo = self.mo_coeff
+        self.Delta  = Delta
+        self.Pi = Pi
+#        max_cyc_micro = 1
+#        while(True):
+#            njk = 0
+#            
+#            for imicro in range(max_cyc_micro):
+#                rota = rotate_orb_cc(self, mo, mo_occ, )
+#                u, g_orb, njk1, r0 = next(rota)
+#                rota.close()
+#                njk += njk1
+#                norm_t = np.linalg.norm(u - np.eye(nmo))
+#                norm_gorb = np.linalg.norm(g_orb)
+#                de = np.dot(pack_uniq_var(u, mo, ncore, npair), g_orb)
+#
+#                u = u.copy()
+#                g_orb = g_orb.copy()
+#                mo = rotate_mo(mo, u)
+#            mo_occ = get_occ(self, mo, ao_ovlp, self.ncore, self.npair, self.nopen, mo_occ[ncore:ncore+2*npair+nopen],
+#                          h_mo, J, K)
+#
+#
+        #get_grad(self, self.mo_occ, mo, h_mo, self.ncore, self.npair, self.nopen, Delta, Pi, J, K)
+#            break
+        return e0, e_elec
+        
+        
+    def ao2mo(self, mo=None):
+        if mo is None:
+            mo = self.mo_coeff
         #if self._scf._eri is not None:
         #    eri = ao2mo.full(self._scf._eri, mo_coeff,
         #                     max_memory=self.max_memory)
@@ -175,10 +221,10 @@ def _ao2mo(mo1, mo2, ao_eri):
     K = einsum('ijkl,ip,jq,kp,lq -> pq', ao_eri, mo1, mo2, mo1, mo2)
     return J, K
 
-def rotate_ci(ci, ):
-    pass
+#def rotate_ci(ci, ):
+#    pass
 
-def get_grad(nof, f, mo, h_mo, ncore, npair, nopen, Delta, Pi):
+def get_grad(nof, f, mo, h_mo, ncore, npair, nopen, Delta, Pi, J, K):
     occ = ncore + 2*npair + nopen
     mo_o = mo[:,:occ]
     mo_v = mo[:,occ:]
@@ -196,8 +242,72 @@ def get_grad(nof, f, mo, h_mo, ncore, npair, nopen, Delta, Pi):
     eri2 = ao2mo.general(_eri, (mo_o, mo_v, mo_o, mo_o), max_memory=nof.max_memory)
     goo = einsum('qp,pq->pq', df, h_mo[:occ,:occ]) + einsum('qpk,pqkk->pq', da, eri1) + einsum('qpk,pkqk->pq', db, eri1)
     gov = einsum('q,pq->pq', f[:occ], h_mo[occ:,:occ]) +  einsum('qk,qpkk->pq', a, eri2) + einsum('qk,kpkq->pq', b, eri2)
-    #print(goo)
-    #print(gov)
+    print(goo)
+    print(gov)
+    #g = np.hstack((goo,gov))
+    #Joo = J[:occ,:occ]
+    #Koo = K[:occ,:occ]
+    #Jvo = J[occ:,:occ]
+    #Kvo = K[occ:,:occ]
+    #hdiag = einsum('i,j->ij', f[:occ], h_mo[occ:,occ:].diagonal()) + einsum('ik,jk->ij', a, Jvo) + einsum('ik,jk->ij', b, Kvo)
+    #hdiag -= einsum('i,i->i', f[:occ], h_mo[:occ,:occ].diagonal()) + einsum('ik,ik->i', a, Joo) + einsum('ik,ik->i', b, Koo)
+    #return g, hdiag
 
-def gen_g_hop(mf, mo, mo_occ):
-    pass
+def rotate_mo(mo, u):
+    return np.dot(mo, u)
+
+def rearrange(mo, ncore, npair):
+    mo2 = np.zeros_like(mo)
+    mo2[:,:ncore] = mo[:,:ncore]
+    mo2[:,ncore+2*npair:] = mo[:,ncore+2*npair:]
+    for i in range(npair):
+        mo2[:,ncore+npair-i-1] = mo[:,ncore+2*i]
+        mo2[:,ncore+npair+i] = mo[:,ncore+2*i+1]
+    return mo2
+
+
+class SOPNOF(CASSCF):
+    def casci(self, mo_coeff, ci0=None, eris=None, verbose=None, envs=None):
+        #self._scf.mo_coeff = mo_coeff 
+        e = self.fcisolver.kernel(self._scf, mo_coeff)
+        #self.nof = thenof
+        return e, e, None
+
+
+class fakeFCISolver():
+    def __init__(self):
+        self.nof = None
+
+    def kernel(self, _scf, mo_coeff,  **kwargs):
+        if self.nof is None:
+            thenof = PNOF(_scf)
+            thenof.ncore = self.ncore
+            thenof.npair = self.npair
+            #thenof.sorting = self.sorting
+            e = thenof.kernel(mo_coeff)[0]
+            self.nof = thenof
+        else:
+            e = self.nof.kernel(mo_coeff)[0]
+        return e
+        
+    def make_rdm12(self, ci, ncas, nelec):
+        nof = self.nof
+        ncore = nof.ncore
+        f = nof.mo_occ
+        Delta = nof.Delta
+        Pi = nof.Pi
+        a = 2*einsum('q,p->qp', f, f) - 2*Delta
+        b = -einsum('q,p->qp', f, f) + Delta + Pi
+        #print(a[:ncas,:ncas])
+        #print(b[:ncas,:ncas])
+        nmo = a.shape[0]
+        rdm1 = 2*np.diag(f[ncore:ncore+ncas])
+        rdm2_aa = np.zeros((ncas,ncas,ncas,ncas))
+        #rdm2_ab = np.zeros((nmo,nmo,nmo,nmo))
+        for i in range(ncas):
+            for j in range(ncas):
+                rdm2_aa[i,i,j,j] += a[ncore+i,ncore+j]
+                rdm2_aa[i,j,j,i] += b[ncore+i,ncore+j]
+        rdm2 = 2*rdm2_aa
+        return rdm1, rdm2
+        
