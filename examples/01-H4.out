@@ -1,0 +1,220 @@
+
+
+******** <class 'pyscf.scf.hf.RHF'> ********
+method = RHF
+initial guess = minao
+damping factor = 0
+level_shift factor = 0
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+SCF conv_tol = 1e-09
+SCF conv_tol_grad = None
+SCF max_cycles = 1
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /home/wsr/pyNOF/examples/tmpdxjjt_ly
+max_memory 4000 MB (current use 112 MB)
+Set gradient conv threshold to 3.16228e-05
+init E= -1.62737079574495
+  HOMO = -0.31601897762191  LUMO = 0.0519695293873409
+cycle= 1 E= -2.14943709604663  delta_E= -0.522  |g|= 0.0844  |ddm|= 1.02
+SCF not converged.
+SCF energy = -2.14943709604663
+             #0      #1      #2      #3      #4      #5     
+ 0 H1 1s              -0.248  -0.567           0.562  -0.838
+ 0 H1 2s      -0.113  -0.337  -0.558          -0.413   0.975
+ 1 H2 1s              -0.263   0.647   0.234   0.663  -0.245
+ 1 H2 2s              -0.429   0.659   0.270  -0.443  -0.227
+ 2 H3 1s       0.263          -0.234  -0.647   0.663   0.245
+ 2 H3 2s       0.429          -0.270  -0.659  -0.443   0.227
+ 3 H4 1s       0.248                   0.567   0.562   0.838
+ 3 H4 2s       0.337   0.113           0.558  -0.413  -0.975
+             #6      #7     
+ 0 H1 1s      -0.608        
+ 0 H1 2s       1.171   1.388
+ 1 H2 1s       0.580   0.788
+ 1 H2 2s      -0.942  -3.361
+ 2 H3 1s       0.580  -0.788
+ 2 H3 2s      -0.942   3.361
+ 3 H4 1s      -0.608        
+ 3 H4 2s       1.171  -1.388
+
+******** <class 'nof.SOPNOF'> ********
+CAS (2e+2e, 4o), ncore = 0, nvir = 4
+max_cycle_macro = 15
+max_cycle_micro = 4
+conv_tol = 1e-07
+conv_tol_grad = None
+orbital rotation max_stepsize = 1.5
+augmented hessian ah_max_cycle = 30
+augmented hessian ah_conv_tol = 1e-12
+augmented hessian ah_linear dependence = 1e-14
+augmented hessian ah_level shift = 1e-08
+augmented hessian ah_start_tol = 1e-08
+augmented hessian ah_start_cycle = 3
+augmented hessian ah_grad_trust_region = 1e+06
+kf_trust_region = 3
+kf_interval = 4
+ci_response_space = 4
+ci_grad_trust_region = 3
+with_dep4 0
+natorb = False
+canonicalization = True
+sorting_mo_energy = False
+ao2mo_level = 2
+chkfile = /home/wsr/pyNOF/examples/tmpdxjjt_ly
+max_memory 4000 MB (current use 125 MB)
+internal_rotation = True
+Start 2-step CASSCF
+
+******** <class 'nof.PNOF'> ********
+guess ci [0.948683 0.948683]
+cycle     maxq      dE      maxg
+   0                       0.546141
+   1    0.050000 -0.048043 0.413995 
+Start Forming U
+reset G
+   2    0.046967 -0.032919 0.286432 
+reset G
+   3    0.021576 -0.011080 0.227022 
+reset G
+   4    0.013870 -0.005765 0.188634 
+   5    0.050000 -0.011911 0.049438 
+reset G
+   6    0.001411 -0.000134 0.045501 
+   7    0.016303 -0.000742 0.000005 
+   8    0.000002 -0.000000 0.000000 
+ci [0.992613 0.992613]
+intrinsic occ [0.98528 0.98528 0.01472 0.01472]
+PNOF5(GVB) energy -2.194856
+Set conv_tol_grad to 0.000316228
+    CPU time for Initializing 2-step CASSCF      0.12 sec, wall time      0.03 sec
+    CPU time for update CAS DM      0.00 sec, wall time      0.00 sec
+    |g|= 0.05
+    CPU time for gen h_op      0.03 sec, wall time      0.00 sec
+    imic 1(10)  |g[o]|=0.000388  |dxi|=0.156  max(|x|)=0.0857  |dr|=0.156  eig=-0.00248  seig=0.00241
+    CPU time for aug_hess in 1 inner iters      0.01 sec, wall time      0.01 sec
+    CPU time for orbital rotation      0.04 sec, wall time      0.01 sec
+Active space overlap to initial guess, SVD = [0.999997 0.999957 0.995357 0.992657]
+Active space overlap to last step, SVD = [0.999997 0.999957 0.995357 0.992657]
+    CPU time for update eri      0.01 sec, wall time      0.00 sec
+micro 0  ~dE=-0.00246  |u-1|=0.221  |g[o]|= 0.05  |dm1|= 2.79
+    CPU time for micro iter 0      0.05 sec, wall time      0.01 sec
+guess ci [0.992613 0.992613]
+cycle     maxq      dE      maxg
+   0                       0.023091
+   1    0.011546 -0.000180 0.007503 
+Start Forming U
+reset G
+   2    0.000192 -0.000003 0.006994 
+   3    0.002639 -0.000018 0.000000 
+   4    0.000000 -0.000000 0.000000 
+ci [0.991518 0.991518]
+intrinsic occ [0.983107 0.983107 0.016893 0.016893]
+PNOF5(GVB) energy -2.197582
+    CPU time for CASCI solver      0.06 sec, wall time      0.02 sec
+    CPU time for macro iter 1      0.11 sec, wall time      0.02 sec
+    CPU time for update CAS DM      0.00 sec, wall time      0.00 sec
+    |g|=0.00464
+    CPU time for gen h_op      0.02 sec, wall time      0.00 sec
+    imic 1(8)  |g[o]|=5.7e-07  |dxi|=0.0193  max(|x|)=0.00813  |dr|=0.0193  eig=-2.93e-05  seig=0.00261
+    CPU time for orbital rotation      0.04 sec, wall time      0.01 sec
+Active space overlap to initial guess, SVD = [0.999992 0.999949 0.995166 0.991137]
+Active space overlap to last step, SVD = [1.       1.       0.999931 0.999884]
+    CPU time for update eri      0.01 sec, wall time      0.00 sec
+micro 0  ~dE=-2.93e-05  |u-1|=0.0273  |g[o]|=0.00464  |dm1|=0.00869
+    CPU time for micro iter 0      0.05 sec, wall time      0.01 sec
+guess ci [0.991518 0.991518]
+cycle     maxq      dE      maxg
+   0                       0.003161
+   1    0.001580 -0.000003 0.000970 
+Start Forming U
+reset G
+   2    0.000025 -0.000000 0.000906 
+   3    0.000347 -0.000000 0.000000 
+   4    0.000000 0.000000 0.000000 
+ci [0.99136 0.99136]
+intrinsic occ [0.982794 0.982794 0.017206 0.017206]
+PNOF5(GVB) energy -2.197615
+    CPU time for CASCI solver      0.04 sec, wall time      0.01 sec
+    CPU time for macro iter 2      0.08 sec, wall time      0.02 sec
+    CPU time for update CAS DM      0.00 sec, wall time      0.00 sec
+    |g|=0.000487
+    CPU time for gen h_op      0.03 sec, wall time      0.00 sec
+    imic 1(7)  |g[o]|=1.49e-08  |dxi|=0.00266  max(|x|)=0.00118  |dr|=0.00266  eig=-4.85e-07  seig=4.66e-05
+    CPU time for orbital rotation      0.04 sec, wall time      0.00 sec
+Active space overlap to initial guess, SVD = [0.999991 0.999948 0.995185 0.990899]
+Active space overlap to last step, SVD = [1.       1.       0.999999 0.999998]
+    CPU time for update eri      0.01 sec, wall time      0.00 sec
+micro 0  ~dE=-4.85e-07  |u-1|=0.00376  |g[o]|=0.000487  |dm1|=0.00125
+    CPU time for micro iter 0      0.05 sec, wall time      0.01 sec
+guess ci [0.99136 0.99136]
+cycle     maxq      dE      maxg
+   0                       0.000409
+   1    0.000204 -0.000000 0.000124 
+Start Forming U
+reset G
+   2    0.000003 -0.000000 0.000116 
+   3    0.000045 -0.000000 0.000000 
+   4    0.000000 0.000000 0.000000 
+ci [0.991339 0.991339]
+intrinsic occ [0.982753 0.982753 0.017247 0.017247]
+PNOF5(GVB) energy -2.197616
+    CPU time for CASCI solver      0.03 sec, wall time      0.01 sec
+    CPU time for macro iter 3      0.08 sec, wall time      0.02 sec
+    CPU time for update CAS DM      0.00 sec, wall time      0.00 sec
+    |g|=6.27e-05
+    CPU time for gen h_op      0.03 sec, wall time      0.00 sec
+    imic 1(3)  |g[o]|=2.58e-07  |dxi|=0.00035  max(|x|)=0.000156  |dr|=0.00035  eig=-8.33e-09  seig=4.43e-06
+    CPU time for orbital rotation      0.04 sec, wall time      0.00 sec
+Active space overlap to initial guess, SVD = [0.999991 0.999948 0.995187 0.990867]
+Active space overlap to last step, SVD = [1. 1. 1. 1.]
+    CPU time for update eri      0.01 sec, wall time      0.00 sec
+micro 0  ~dE=-8.33e-09  |u-1|=0.000494  |g[o]|=6.27e-05  |dm1|=0.000163
+    CPU time for micro iter 0      0.05 sec, wall time      0.01 sec
+guess ci [0.991339 0.991339]
+cycle     maxq      dE      maxg
+   0                       0.000053
+   1    0.000027 -0.000000 0.000016 
+Start Forming U
+reset G
+   2    0.000000 -0.000000 0.000015 
+   3    0.000006 -0.000000 0.000000 
+ci [0.991336 0.991336]
+intrinsic occ [0.982748 0.982748 0.017252 0.017252]
+PNOF5(GVB) energy -2.197616
+    CPU time for CASCI solver      0.03 sec, wall time      0.01 sec
+    CPU time for macro iter 4      0.08 sec, wall time      0.02 sec
+2-step CASSCF converged in 4 macro (28 JK 4 micro) steps
+CASSCF canonicalization
+Density matrix diagonal elements [1.965507 1.965507 0.034493 0.034493]
+i = 1  <i|F|i> =  -0.53375432
+i = 2  <i|F|i> =  -0.53375432
+i = 3  <i|F|i> =   0.48309896
+i = 4  <i|F|i> =   0.48309896
+i = 5  <i|F|i> =   1.02846956
+i = 6  <i|F|i> =   1.03177546
+i = 7  <i|F|i> =   1.17495714
+i = 8  <i|F|i> =   1.38602867
+    CPU time for 2-step CASSCF      0.48 sec, wall time      0.12 sec
+CASSCF energy = -2.1976159248576
+CASCI E = -2.1976159248576  E(CI) = -2.1976159248576
+             #0      #1      #2      #3      #4      #5     
+ 0 H1 1s              -0.257  -0.524           0.573  -0.780
+ 0 H1 2s              -0.338  -0.710  -0.109  -0.323   1.454
+ 1 H2 1s              -0.275   0.622   0.103   0.653   0.168
+ 1 H2 2s              -0.417   0.934   0.623  -0.510  -1.617
+ 2 H3 1s       0.275          -0.103  -0.622   0.653  -0.168
+ 2 H3 2s       0.417          -0.623  -0.934  -0.510   1.617
+ 3 H4 1s       0.257                   0.524   0.573   0.780
+ 3 H4 2s       0.338           0.109   0.710  -0.323  -1.454
+             #6      #7     
+ 0 H1 1s      -0.628   0.319
+ 0 H1 2s       1.192   0.759
+ 1 H2 1s       0.545   0.880
+ 1 H2 2s      -0.927  -2.821
+ 2 H3 1s       0.545  -0.880
+ 2 H3 2s      -0.927   2.821
+ 3 H4 1s      -0.628  -0.319
+ 3 H4 2s       1.192  -0.759

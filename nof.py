@@ -267,6 +267,14 @@ def rearrange(mo, ncore, npair):
 
 
 class SOPNOF(CASSCF):
+    def __init__(self, mf_or_mol, ncas, nelecas, ncore=None, frozen=None):
+        CASSCF.__init__(self, mf_or_mol, ncas, nelecas, ncore)
+        self.max_cycle_macro = 15
+        # classic AH instead of CIAH
+        self.ah_start_tol = 1e-8
+        self.max_stepsize = 1.5
+        self.ah_grad_trust_region = 1e6
+        
     def casci(self, mo_coeff, ci0=None, eris=None, verbose=None, envs=None):
         #self._scf.mo_coeff = mo_coeff 
         e = self.fcisolver.kernel(self._scf, mo_coeff)
