@@ -1,6 +1,7 @@
 core.*
 tmp*
 /test/
+*.out*
 *.chk
 *.pchk
 /phf/

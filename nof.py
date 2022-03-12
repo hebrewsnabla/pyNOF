@@ -161,20 +161,26 @@ def get_occ(nof, mo, ao_ovlp, ncore, npair, nopen, guess, h_mo, J, K):
         occ[ncore+npair:ncore+2*npair] = np.flip(1.0 - X**2)
         return occ
     def get_grad(t):
-        X = np.sin(t)
-        return get_ci_grad(nof, X, mo_act, npair, ncore)*np.cos(t)
+        X = t2X(t)
+        return get_ci_grad(nof, X, mo_act, npair, ncore)*np.sin(t)*np.cos(t)
     def get_E(t):
-        X = np.sin(t)
+        X = t2X(t)
         occ = update_occ(X, ncore, npair, nopen, len(new_occ))
         Delta, Pi = get_DP(occ, ncore, npair, nopen)
         return energy_elec(occ, h_mo, J, K, Delta, Pi)
 
-    new_t = qn_iter(np.arcsin(guess), get_grad, get_E)
-    ci = np.sin(new_t)
+    new_t = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t)
+    ci = t2X(new_t)
     print('ci', ci)
     new_occ = update_occ(ci, ncore, npair, nopen, len(new_occ))
     
     return new_occ
+
+def t2X(t):
+    return 0.5+0.5*np.sin(t)**2
+
+def X2t(X):
+    return np.arcsin((X*2-1)**0.5)
 
 def get_ci_grad(nof, guess, mo, npair, ncore):
     #print('ci', guess)

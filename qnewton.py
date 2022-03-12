@@ -43,12 +43,13 @@ def constrain(X, Xmin, Xmax):
     #print(X)
     return X
 
-def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
+def qn_iter(X, getf, getE, t2N, N2t, maxstep=0.05, maxiter=25, debug=False):
     #Xmin, Xmax = Xrange
     E = getE(X)
     f, hdiag = getf(X)
     print('cycle     maxq      dE      maxg')
     print("   0                       %.6f"% abs(f).max())
+    if debug: print( 'X', X, 'f', f)
     if np.dot(f.T, f) < 1e-10 :
         return X
     nx = len(X)
@@ -73,7 +74,8 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
         else:
             #print("  1   %.3f %.3f %.3f "%(abs(q).max(), dE, abs(f).max()))
             dump_cyc(1, q, dE, f)
-            print("Start Forming U")
+            if debug: print('q', q, 'X', X, 'f', f)
+            #print("Start Forming U")
             U = -1*np.dot(oldG, f + oldf*(oldalpha-1))
             d = f - oldf
             #print("U: ", U, "d:", d)
@@ -107,6 +109,7 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
         f, hdiag = getf(X)
         #print("Cycle %d  X: "%cyc, X, "E:", E, 'f:', f)
         dump_cyc(cyc, q, dE, f)
+        if debug: print('q', q, 'X', X, 'f', f)
         U = -1*np.dot(oldG, f + oldf*(oldalpha-1))
         d = f - oldf
         #print(U, d)
@@ -124,7 +127,8 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
             G = oldG + aa*np.einsum('i,j->ij',U, U)
             alpha = 1
     
-        if np.dot(f.T, f) < 1e-10 and abs(q).max() < 1e-5:
+        if check_conv(f, q, dE):
+            print("occ opt converged")
             break
         else:
             cyc += 1
@@ -133,7 +137,16 @@ def qn_iter(X, getf, getE, maxstep=0.05, maxiter=30):
             break
     return X
 
+def check_conv(f, q, dE):
+    normf = np.linalg.norm(f)
+    maxf = abs(f).max()
+    normq = np.linalg.norm(q)
+    maxq = abs(q).max()
+    conv = normf < 1e-6 and maxf < 1e-5 and normq < 1e-5 and maxq < 7e-5 and dE < 5e-8
+    return conv
+    
+
 def dump_cyc(cyc, q, dE, f):
-    print("  %2d    %.6f %.6f %.6f "%(cyc, abs(q).max(), dE, abs(f).max()))
+    print("  %2d    %-9.5g %-9.5g %-9.5g "%(cyc, abs(q).max(), dE, abs(f).max()))
 '''
 '''
