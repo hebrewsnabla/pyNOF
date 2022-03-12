@@ -26,11 +26,13 @@ class PNOF():
         self.nmo = None
         print('\n******** %s ********' % self.__class__)
 
-    def kernel(self, mo=None):
+    def kernel(self, mo=None, mo_occ=None):
         if mo is None:
             mo = self.mo_coeff
         else:
             self.mo_coeff = mo
+        if mo_occ is not None:
+            self.mo_occ = mo_occ
         #dump_mo(self.mol, mo[:,:12])
         #if self.sorting == 'gau':
         #    mo = rearrange(mo, self.ncore, self.npair)
@@ -277,7 +279,7 @@ class SOPNOF(CASSCF):
         
     def casci(self, mo_coeff, ci0=None, eris=None, verbose=None, envs=None):
         #self._scf.mo_coeff = mo_coeff 
-        e = self.fcisolver.kernel(self._scf, mo_coeff)
+        e = self.fcisolver.kernel(self._scf, mo_coeff, self.mo_occ)
         #self.nof = thenof
         return e, e, None
 
@@ -286,13 +288,13 @@ class fakeFCISolver():
     def __init__(self):
         self.nof = None
 
-    def kernel(self, _scf, mo_coeff,  **kwargs):
+    def kernel(self, _scf, mo_coeff, mo_occ, **kwargs):
         if self.nof is None:
             thenof = PNOF(_scf)
             thenof.ncore = self.ncore
             thenof.npair = self.npair
             #thenof.sorting = self.sorting
-            e = thenof.kernel(mo_coeff)[0]
+            e = thenof.kernel(mo_coeff, mo_occ)[0]
             self.nof = thenof
         else:
             e = self.nof.kernel(mo_coeff)[0]
