@@ -2,6 +2,8 @@ core.*
 tmp*
 /test/
 *.out*
+out
+/examples/bench/
 *.chk
 *.pchk
 /phf/

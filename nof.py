@@ -1,10 +1,11 @@
-from pyscf import lib, ao2mo, scf
+from pyscf import lib, ao2mo, scf, gto
 from pyscf.mcscf.mc1step import expmat, CASSCF
 from pyscf.soscf import ciah
 import numpy as np
 from automr.autocas import check_uno
 from automr.dump_mat import dump_mo
 from qnewton import qn_iter
+from timing import timing
 
 einsum = lib.einsum
 
@@ -96,7 +97,6 @@ class PNOF():
 #            break
         return e0, e_elec
         
-        
     def ao2mo(self, mo=None):
         if mo is None:
             mo = self.mo_coeff
@@ -107,14 +107,18 @@ class PNOF():
         #    eri = ao2mo.full(self.mol, mo_coeff, verbose=self.verbose,
         #                     max_memory=self.max_memory)
         #if self._hf._eri is None:
-        _eri = self.mol.intor('int2e')
-        #else:
-        #    _eri = self._hf._eri
-        #print(_eri.shape, mo.shape)
-        #J = einsum('ijkl,ip,jp,kq,lq -> pq', _eri, mo, mo, mo, mo)
-        #K = einsum('ijkl,ip,jq,kp,lq -> pq', _eri, mo, mo, mo, mo)
-        J, K = _ao2mo(mo, mo, _eri)
+        M = mo.shape[0]
+        if self._is_mem_enough():
+            _eri = self.mol.intor('int2e')
+            J, K = _ao2mo_incore(mo, mo, _eri)
+        else:
+            J, K = _ao2mo_sdirect(mo, mo, self.mol)
+
         return J, K
+
+    def _is_mem_enough(self):
+        nbf = self.mol.nao_nr()
+        return 8*nbf**4/1e6+lib.current_memory()[0] < self.max_memory*.95
 
 def energy_elec(mo_occ, h_mo, J, K, Delta, Pi):
     E1 = 2*np.dot(mo_occ, h_mo.diagonal())
@@ -145,6 +149,7 @@ def get_DP(f, ncore, npair, nopen):
     #print(Pi[:15,:15])
     return Delta, Pi
 
+@timing
 def get_occ(nof, mo, ao_ovlp, ncore, npair, nopen, guess, h_mo, J, K):
     new_occ = np.zeros(mo.shape[-1])
     new_occ[:ncore] = 1.0
@@ -162,7 +167,7 @@ def get_occ(nof, mo, ao_ovlp, ncore, npair, nopen, guess, h_mo, J, K):
         return occ
     def get_grad(t):
         X = t2X(t)
-        return get_ci_grad(nof, X, mo_act, npair, ncore)*np.sin(t)*np.cos(t)
+        return get_ci_grad(nof, X, mo_act, npair, ncore, J, K)*np.sin(t)*np.cos(t)
     def get_E(t):
         X = t2X(t)
         occ = update_occ(X, ncore, npair, nopen, len(new_occ))
@@ -182,11 +187,12 @@ def t2X(t):
 def X2t(X):
     return np.arcsin((X*2-1)**0.5)
 
-def get_ci_grad(nof, guess, mo, npair, ncore):
+def get_ci_grad(nof, guess, mo, npair, ncore, J, K):
     #print('ci', guess)
     mo_g = mo[:, ncore:ncore+npair]
     mo_u = np.flip(mo[:, ncore+npair:], axis=1) 
     mo_core = mo[:,:ncore]
+    """
     #dump_mo(nof.mol, mo_g)
     #dump_mo(nof.mol, mo_u)
     _eri = nof.mol.intor('int2e')
@@ -195,6 +201,20 @@ def get_ci_grad(nof, guess, mo, npair, ncore):
     Jgu, Kgu = _ao2mo(mo_g, mo_u, _eri)
     Jgc, Kgc = _ao2mo(mo_g, mo_core, _eri)
     Juc, Kuc = _ao2mo(mo_u, mo_core, _eri)
+    """
+    g_slice = slice(ncore, ncore+npair)
+    u_slice = slice(ncore+2*npair-1, ncore+npair-1,-1)
+    c_slice = slice(0, ncore)
+    Jgg = J[g_slice, g_slice]
+    Juu = J[u_slice, u_slice]
+    Jgu = J[g_slice, u_slice]
+    Jgc = J[g_slice, c_slice]
+    Juc = J[u_slice, c_slice]
+    Kgg = K[g_slice, g_slice]
+    Kuu = K[u_slice, u_slice]
+    Kgu = K[g_slice, u_slice]
+    Kgc = K[g_slice, c_slice]
+    Kuc = K[u_slice, c_slice]
     lam0 = h1e(nof._hf, mo_g).diagonal() - h1e(nof._hf, mo_u).diagonal() + einsum('ki->k', 2*Jgc - Kgc - 2*Juc + Kuc)
     lam0 += (Jgg.diagonal() - Juu.diagonal())*0.5
     def tri_k1(m):
@@ -224,9 +244,24 @@ def get_ci_grad(nof, guess, mo, npair, ncore):
 
     
 
-def _ao2mo(mo1, mo2, ao_eri):
+@timing    
+def _ao2mo_incore(mo1, mo2, ao_eri):
     J = einsum('ijkl,ip,jp,kq,lq -> pq', ao_eri, mo1, mo1, mo2, mo2)
     K = einsum('ijkl,ip,jq,kp,lq -> pq', ao_eri, mo1, mo2, mo1, mo2)
+    return J, K
+
+@timing    
+def _ao2mo_sdirect(mo1, mo2, mol):
+    nbas = mol.nbas
+    J = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    K = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    for i in range(nbas):
+        g = mol.intor('int2e', shls_slice=(i, i+1, 0, nbas, 0, nbas, 0, nbas))
+        id1, id2 = gto.nao_nr_range(mol,i,i+1)
+        ao_slice = slice(id1,id2)
+        #print(ao_slice, g.shape)
+        J += einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice,:], mo1, mo2, mo2)
+        K += einsum('ijkl,ip,jq,kp,lq -> pq', g, mo1[ao_slice,:], mo2, mo1, mo2)
     return J, K
 
 #def rotate_ci(ci, ):
