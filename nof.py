@@ -1,7 +1,9 @@
-from pyscf import lib, ao2mo, scf, gto
+from pyscf import lib, ao2mo, scf, gto, df
 from pyscf.mcscf.mc1step import expmat, CASSCF
 from pyscf.soscf import ciah
+from pyscf.df.addons import DEFAULT_AUXBASIS
 import numpy as np
+import scipy
 from automr.autocas import check_uno
 from automr.dump_mat import dump_mo
 from qnewton import qn_iter
@@ -25,6 +27,7 @@ class PNOF():
         else:
             self.nopen = _hf.spin
         self.nmo = None
+        self.with_df = False
         print('\n******** %s ********' % self.__class__)
 
     def kernel(self, mo=None, mo_occ=None):
@@ -108,12 +111,16 @@ class PNOF():
         #                     max_memory=self.max_memory)
         #if self._hf._eri is None:
         M = mo.shape[0]
-        if self._is_mem_enough():
-            _eri = self.mol.intor('int2e')
-            J, K = _ao2mo_incore(mo, mo, _eri)
+        if self.with_df:
+            J, K = _ao2mo_df(mo, mo, self.mol)
         else:
-            J, K = _ao2mo_sdirect(mo, mo, self.mol)
-
+            if self._is_mem_enough():
+                _eri = self.mol.intor('int2e')
+                J, K = _ao2mo_incore(mo, mo, _eri)
+            else:
+                #J, K = _ao2mo_sdirect(mo, mo, self.mol)
+                J, K = _ao2mo_sdirect_s4(mo, mo, self.mol)
+        print('current mem %d MB' % lib.current_memory()[0])
         return J, K
 
     def _is_mem_enough(self):
@@ -242,7 +249,24 @@ def get_ci_grad(nof, guess, mo, npair, ncore, J, K):
     #print(hdiag)
     return ci_grad, hdiag
 
-    
+@timing    
+def _ao2mo_df(mo1, mo2, mol):
+    auxmol = mol.copy()
+    auxmol.basis = DEFAULT_AUXBASIS[mol.basis][1]
+    auxmol.build()
+    nao = mol.nao
+    nao_df = auxmol.nao    
+    int2c2e = auxmol.intor("int2c2e")
+    int2c2e.shape
+    int3c2e = df.incore.aux_e2(mol, auxmol)
+    int2c2e_half = scipy.linalg.cholesky(int2c2e, lower=True)
+    V_df = scipy.linalg.solve_triangular(int2c2e_half, int3c2e.reshape(-1, nao_df).T, lower=True)\
+               .reshape(nao_df, nao, nao).transpose((1, 2, 0))
+    V_df_pp = einsum("uvP, up, vp -> pP", V_df, mo1, mo2)
+    V_df_pq = einsum("uvP, up, vq -> pqP", V_df, mo1, mo2)
+    J = einsum("pP,qP->pq", V_df_pp, V_df_pp)
+    K = einsum("pqP,pqP->pq", V_df_pq, V_df_pq)
+    return J,K
 
 @timing    
 def _ao2mo_incore(mo1, mo2, ao_eri):
@@ -263,6 +287,97 @@ def _ao2mo_sdirect(mo1, mo2, mol):
         J += einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice,:], mo1, mo2, mo2)
         K += einsum('ijkl,ip,jq,kp,lq -> pq', g, mo1[ao_slice,:], mo2, mo1, mo2)
     return J, K
+
+@timing    
+def _ao2mo_sdirect_s4(mo1, mo2, mol):
+    nbas = mol.nbas
+    J = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    K = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    for i in range(nbas):
+        id1, id2 = gto.nao_nr_range(mol,i,i+1)
+        ao_slice_i = slice(id1,id2)
+        g_jkl = mol.intor('int2e', shls_slice=(i, i+1, 0, nbas, 0, nbas, 0, nbas), aosym='s2kl')
+        for j in range(i):
+            #g = mol.intor('int2e', shls_slice=(i, i+1, j, j+1, 0, nbas, 0, nbas), aosym='s2kl')
+            #print(g.shape)
+            jd1, jd2 = gto.nao_nr_range(mol,j,j+1)
+            ao_slice_j = slice(jd1,jd2)
+            g = g_jkl[:,ao_slice_j,:]
+            g = kl2full(g)
+            #print(ao_slice, g.shape)
+            J += 2*einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice_i,:], mo1[ao_slice_j,:], mo2, mo2)
+            tmp = einsum('ijkl,kp,lq -> ijpq', g, mo1, mo2)
+            K += einsum('ijpq, ip,jq -> pq', tmp, mo1[ao_slice_i,:], mo2[ao_slice_j,:])
+            K += einsum('ijpq, iq,jp -> pq', tmp, mo1[ao_slice_i,:], mo2[ao_slice_j,:])
+        #g = mol.intor('int2e', shls_slice=(i, i+1, i, i+1, 0, nbas, 0, nbas), aosym='s4')
+        g = g_jkl[:,ao_slice_i,:]
+        g = kl2full(g)
+        J += einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice_i,:], mo1[ao_slice_i,:], mo2, mo2)
+        K += einsum('ijkl,ip,jq,kp,lq -> pq', g, mo1[ao_slice_i,:], mo2[ao_slice_i,:], mo1, mo2)
+    return J, K
+
+@timing    
+def _ao2mo_direct_s4(mo1, mo2, mol):
+    nbas = mol.nbas
+    J = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    K = np.zeros((mo1.shape[-1], mo2.shape[-1]))
+    for i in range(nbas):
+        id1, id2 = gto.nao_nr_range(mol,i,i+1)
+        ao_slice_i = slice(id1,id2)
+        for j in range(i):
+            g = mol.intor('int2e', shls_slice=(i, i+1, j, j+1, 0, nbas, 0, nbas), aosym='s2kl')
+            #print(g.shape)
+            g = kl2full(g)
+            jd1, jd2 = gto.nao_nr_range(mol,j,j+1)
+            ao_slice_j = slice(jd1,jd2)
+            #print(ao_slice, g.shape)
+            J += 2*einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice_i,:], mo1[ao_slice_j,:], mo2, mo2)
+            tmp = einsum('ijkl,kp,lq -> ijpq', g, mo1, mo2)
+            K += einsum('ijpq, ip,jq -> pq', tmp, mo1[ao_slice_i,:], mo2[ao_slice_j,:])
+            K += einsum('ijpq, iq,jp -> pq', tmp, mo1[ao_slice_i,:], mo2[ao_slice_j,:])
+        g = mol.intor('int2e', shls_slice=(i, i+1, i, i+1, 0, nbas, 0, nbas), aosym='s4')
+        g = tril2full(g)
+        J += einsum('ijkl,ip,jp,kq,lq -> pq', g, mo1[ao_slice_i,:], mo1[ao_slice_i,:], mo2, mo2)
+        K += einsum('ijkl,ip,jq,kp,lq -> pq', g, mo1[ao_slice_i,:], mo2[ao_slice_i,:], mo1, mo2)
+    return J, K
+
+def kl2full(g):
+    ni,nj,nkl = g.shape
+    nk = int(np.floor(np.sqrt(nkl*2)))
+    g_new = np.zeros((ni,nj,nk,nk))
+    for i in range(ni):
+        for j in range(nj):
+            g_new[i,j] = tofull(g[i,j], nk)
+    return g_new
+    
+def tofull(g, nk):
+    tmp = np.zeros((nk,nk))
+    tmp[np.tril_indices(nk)] = g
+    tmp += np.tril(tmp,-1).T
+    #tmp[np.diag_indices(nk)] /= 2
+    return tmp
+    
+
+def tril2full(g):
+    #print(g.shape)
+    n1, n2 = g.shape
+    if n1==1:
+        m2 = int(np.floor(np.sqrt(n2*2)))
+        tmp = np.zeros((1,1,m2,m2))
+        tmp[0,0] = tofull(g[0], m2) 
+        return tmp
+    m1 = int(np.floor(np.sqrt(n1*2)))
+    m2 = int(np.floor(np.sqrt(n2*2)))
+    g_new = np.zeros((m1,m1,m2,m2))
+    for i in range(m1):
+        for j in range(i+1):
+            tmp = np.zeros((m2,m2))
+            tmp[np.tril_indices(m2)] = g[i*(i+1)//2+j]
+            tmp += np.tril(tmp,-1).T
+            #tmp[np.diag_indices(m2)] /= 2
+            g_new[i,j] = tmp
+            if i != j: g_new[j,i] = tmp
+    return g_new
 
 #def rotate_ci(ci, ):
 #    pass
@@ -328,6 +443,7 @@ class SOPNOF(CASSCF):
 class fakeFCISolver():
     def __init__(self):
         self.nof = None
+        self.with_df = False
 
     def kernel(self, _scf, mo_coeff, mo_occ, **kwargs):
         if self.nof is None:
@@ -335,6 +451,7 @@ class fakeFCISolver():
             thenof.ncore = self.ncore
             thenof.npair = self.npair
             #thenof.sorting = self.sorting
+            thenof.with_df = self.with_df
             e = thenof.kernel(mo_coeff, mo_occ)[0]
             self.nof = thenof
         else:
