@@ -1,5 +1,7 @@
 from pyscf import lib, ao2mo, scf, gto, df
-from pyscf.mcscf.mc1step import expmat, CASSCF
+from pyscf.lib import logger
+#from pyscf.mcscf.mc1step import expmat, CASSCF
+from pyscf.mcscf import mc1step, casci
 from pyscf.soscf import ciah
 from pyscf.df.addons import DEFAULT_AUXBASIS
 import numpy as np
@@ -30,7 +32,7 @@ class PNOF():
         self.with_df = False
         print('\n******** %s ********' % self.__class__)
 
-    def kernel(self, mo=None, mo_occ=None):
+    def kernel(self, h1eff, eri_cas, mo=None, mo_occ=None):
         if mo is None:
             mo = self.mo_coeff
         else:
@@ -53,8 +55,10 @@ class PNOF():
             ncore = self.ncore
             npair = self.npair
             nact = npair*2
-        h_mo = h1e(self._hf, mo)
-        J,K = self.ao2mo(mo)
+        #h_mo = h1e(self._hf, mo)
+        h_mo = h1eff
+        #J,K = self.ao2mo(mo)
+        J,K = self.eri2jk(eri_cas)
         if self.mo_occ is None:
             guess = np.ones(self.npair)*0.9
             #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
@@ -69,9 +73,9 @@ class PNOF():
         #print('occ', self.mo_occ[:ncore+nact])
         Delta, Pi = get_DP(self.mo_occ, self.ncore, self.npair, self.nopen)
         
-        e_elec = energy_elec(self.mo_occ, h_mo, J, K, Delta, Pi)
-        e0 = e_elec + self._hf.energy_nuc()
-        print('PNOF5(GVB) energy %.6f' % e0)
+        e_elec = energy_elec(self.mo_occ, ncore, nact, h_mo, J, K, Delta, Pi)
+        e0 = e_elec 
+        print('PNOF5(GVB) elec energy %.6f' % e0)
         
         
         self.Delta  = Delta
@@ -123,11 +127,25 @@ class PNOF():
         print('current mem %d MB' % lib.current_memory()[0])
         return J, K
 
+    def eri2jk(self, eri_cas):
+        ni, nj, nk, nl = eri_cas.shape
+        #assert np == nq and na == nb
+        J = np.zeros((ni, nk))
+        K = np.zeros((ni, nk))
+        for i in range(ni):
+            for j in range(nk):
+                J[i,j] = eri_cas[i,i,j,j]
+                K[i,j] = eri_cas[i,j,j,i]
+        return J,K
+
     def _is_mem_enough(self):
         nbf = self.mol.nao_nr()
         return 8*nbf**4/1e6+lib.current_memory()[0] < self.max_memory*.95
 
-def energy_elec(mo_occ, h_mo, J, K, Delta, Pi):
+def energy_elec(mo_occ, ncore, nact, h_mo, J, K, Delta, Pi):
+    mo_occ = mo_occ[ncore:ncore+nact]
+    Delta = Delta[ncore:ncore+nact,ncore:ncore+nact]
+    Pi = Pi[ncore:ncore+nact,ncore:ncore+nact]
     E1 = 2*np.dot(mo_occ, h_mo.diagonal())
     D2 = einsum('q,p->qp', mo_occ, mo_occ) - Delta
     E2 = einsum('qp, pq', Pi, K) + einsum('qp,pq', D2, 2*J - K)
@@ -174,12 +192,13 @@ def get_occ(nof, mo, ao_ovlp, ncore, npair, nopen, guess, h_mo, J, K):
         return occ
     def get_grad(t):
         X = t2X(t)
-        return get_ci_grad(nof, X, mo_act, npair, ncore, J, K)*np.sin(t)*np.cos(t)
+        return get_ci_grad(nof, X, mo_act, npair, 0, h_mo, J, K)*np.sin(t)*np.cos(t)
     def get_E(t):
         X = t2X(t)
         occ = update_occ(X, ncore, npair, nopen, len(new_occ))
         Delta, Pi = get_DP(occ, ncore, npair, nopen)
-        return energy_elec(occ, h_mo, J, K, Delta, Pi)
+        nact = npair*2+nopen
+        return energy_elec(occ, ncore, nact, h_mo, J, K, Delta, Pi)
 
     new_t = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t)
     ci = t2X(new_t)
@@ -194,7 +213,7 @@ def t2X(t):
 def X2t(X):
     return np.arcsin((X*2-1)**0.5)
 
-def get_ci_grad(nof, guess, mo, npair, ncore, J, K):
+def get_ci_grad(nof, guess, mo, npair, ncore, h1eff, J, K):
     #print('ci', guess)
     mo_g = mo[:, ncore:ncore+npair]
     mo_u = np.flip(mo[:, ncore+npair:], axis=1) 
@@ -222,7 +241,8 @@ def get_ci_grad(nof, guess, mo, npair, ncore, J, K):
     Kgu = K[g_slice, u_slice]
     Kgc = K[g_slice, c_slice]
     Kuc = K[u_slice, c_slice]
-    lam0 = h1e(nof._hf, mo_g).diagonal() - h1e(nof._hf, mo_u).diagonal() + einsum('ki->k', 2*Jgc - Kgc - 2*Juc + Kuc)
+    #lam0 = h1e(nof._hf, mo_g).diagonal() - h1e(nof._hf, mo_u).diagonal() + einsum('ki->k', 2*Jgc - Kgc - 2*Juc + Kuc)
+    lam0 = h1eff[g_slice,g_slice].diagonal() - h1eff[u_slice,u_slice].diagonal()
     lam0 += (Jgg.diagonal() - Juu.diagonal())*0.5
     def tri_k1(m):
         #return np.triu(m, k=1) + np.tril(m,k=-1)
@@ -424,39 +444,85 @@ def rearrange(mo, ncore, npair):
     return mo2
 
 
-class SOPNOF(CASSCF):
+class SOPNOF(mc1step.CASSCF):
     def __init__(self, mf_or_mol, ncas, nelecas, ncore=None, frozen=None):
-        CASSCF.__init__(self, mf_or_mol, ncas, nelecas, ncore)
+        mc1step.CASSCF.__init__(self, mf_or_mol, ncas, nelecas, ncore)
         self.max_cycle_macro = 15
         # classic AH instead of CIAH
-        self.ah_start_tol = 1e-8
-        self.max_stepsize = 1.5
-        self.ah_grad_trust_region = 1e6
+        #self.ah_start_tol = 1e-8
+        #self.max_stepsize = 1.5
+        #self.ah_grad_trust_region = 1e6
         
     def casci(self, mo_coeff, ci0=None, eris=None, verbose=None, envs=None):
-        #self._scf.mo_coeff = mo_coeff 
-        e = self.fcisolver.kernel(self._scf, mo_coeff, self.mo_occ)
+        #self._scf.mo_coeff = mo_coeff
+        log = logger.new_logger(self, verbose)
+        if eris is None:
+            fnof = copy.copy(self)
+            fnof.ao2mo = self.get_h2cas
+        else:
+            fnof = mc1step._fake_h_for_fast_casci(self, mo_coeff, eris) 
+        eri_cas = fnof.get_h2eff(mo_coeff)
+        h1eff, e_core = fnof.get_h1eff(mo_coeff)
+        #print(eri_cas.shape, h1eff.shape)
+        e_tot, e_cas = fnof.fcisolver.kernel(self._scf, mo_coeff, self.mo_occ, h1eff, e_core, eri_cas)
         #self.nof = thenof
-        return e, e, None
+        if envs is not None and log.verbose >= logger.INFO:
+            log.debug('CAS space CI energy = %.15g', e_cas)
+
+            if getattr(self.fcisolver, 'spin_square', None):
+                ss = self.fcisolver.spin_square(fcivec, self.ncas, self.nelecas)
+            else:
+                ss = None
+
+            if 'imicro' in envs:  # Within CASSCF iteration
+                if ss is None:
+                    log.info('macro iter %d (%d JK  %d micro), '
+                             'CASSCF E = %.15g  dE = %.8g',
+                             envs['imacro'], envs['njk'], envs['imicro'],
+                             e_tot, e_tot-envs['elast'])
+                else:
+                    log.info('macro iter %d (%d JK  %d micro), '
+                             'CASSCF E = %.15g  dE = %.8g  S^2 = %.7f',
+                             envs['imacro'], envs['njk'], envs['imicro'],
+                             e_tot, e_tot-envs['elast'], ss[0])
+                #if 'norm_gci' in envs and envs['norm_gci'] is not None:
+                #    log.info('               |grad[o]|=%5.3g  '
+                #             '|grad[c]|= %s  |ddm|=%5.3g  |maxRot[o]|=%5.3g',
+                #             envs['norm_gorb0'],
+                #             envs['norm_gci'], envs['norm_ddm'], envs['max_offdiag_u'])
+                #else:
+                #    log.info('               |grad[o]|=%5.3g  |ddm|=%5.3g  |maxRot[o]|=%5.3g',
+                #             envs['norm_gorb0'], envs['norm_ddm'], envs['max_offdiag_u'])
+            else:  # Initialization step
+                if ss is None:
+                    log.info('CASCI E = %.15g', e_tot)
+                else:
+                    log.info('CASCI E = %.15g  S^2 = %.7f', e_tot, ss[0])
+        return e_tot, e_cas, None
 
 
 class fakeFCISolver():
     def __init__(self):
+        #casci.CASCI.__init__(self, mf_or_mol, ncas, nelecas)
         self.nof = None
         self.with_df = False
 
-    def kernel(self, _scf, mo_coeff, mo_occ, **kwargs):
+    def kernel(self, _scf, mo_coeff, mo_occ, h1eff, e_core, eri_cas, **kwargs):
+        #eri_cas = self.get_h2eff()
+        #h1eff, e_core = self.get_h1eff(mo_coeff, ncore, ncas)
         if self.nof is None:
             thenof = PNOF(_scf)
             thenof.ncore = self.ncore
             thenof.npair = self.npair
             #thenof.sorting = self.sorting
             thenof.with_df = self.with_df
-            e = thenof.kernel(mo_coeff, mo_occ)[0]
+            e = thenof.kernel( h1eff, eri_cas, mo=mo_coeff, mo_occ=mo_occ)[0]
             self.nof = thenof
         else:
-            e = self.nof.kernel(mo_coeff)[0]
-        return e
+            e = self.nof.kernel( h1eff, eri_cas, mo=mo_coeff)[0]
+        e_cas = e 
+        e_tot = e + e_core
+        return e_tot, e_cas
         
     def make_rdm12(self, ci, ncas, nelec):
         nof = self.nof
