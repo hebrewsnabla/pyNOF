@@ -19,8 +19,8 @@ thenof.mo_occ = noon / 2
 thenof.fcisolver = nof.fakeFCISolver()
 thenof.fcisolver.ncore = ncore
 thenof.fcisolver.npair = nacto//2
+thenof.fcisolver.with_df = True
 thenof.internal_rotation = True
-thenof.with_df = True
 thenof.mc2step()
 #dump_mat.dump_mo(thenof.mol, thenof.mo_coeff)
 
