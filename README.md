@@ -19,5 +19,4 @@ Add `/path/to/pyAutoMR` and `/path/to/pyNOF` to your PYTHONPATH.
 
 ## Limitations
 * nopen > 0 not supported.
-* currently fully incore, so N^4 memory required.
 
