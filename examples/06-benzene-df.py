@@ -31,7 +31,7 @@ mf = loc_asrot(mf, nacto, nelecact, ncore)
 #dump_mat.dump_mo(mf.mol, mf.mo_coeff)
 
 #exit()
-thenof = nof.SOPNOF(mf, nacto, nelecact)
+thenof = nof.SOPNOF(mf, nacto, nelecact).density_fit()
 thenof.verbose = 5
 #thenof.mo_occ = noon / 2
 thenof.fcisolver = nof.fakeFCISolver()
@@ -41,16 +41,10 @@ thenof.fcisolver.npair = nacto//2
 #thenof.fcisolver.with_df = True
 thenof.internal_rotation = True # important for this case !
 thenof.max_cycle_macro = 30
-thenof.max_stepsize = 0.05      # increase stepsize helps in this case
+thenof.max_stepsize = 0.05
 thenof.mc2step()
 #dump_mat.dump_mo(thenof.mol, thenof.mo_coeff)
 
-
-## benchmark GVB(3) cc-pvqz for benzene
-##                  iter    time
-## SO-GVB@pyNOF      13     2700s
-## DF-SO-GVB@pyNOF   13     1300s
-## SO-GVB@GAMESS     38     2200s
 
 
 

@@ -6,6 +6,7 @@ Currently only PNOF5 is supported and one subspace can only contain 2 orbitals, 
 
 ## Features
 * GVB orbital optimization with augmented Hessian
+* Density fitting
 * generate GVB init guess with 
   - UNO
   - paired LMO (MOKIT required)

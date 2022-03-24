@@ -39,7 +39,6 @@ class PNOF():
             self.mo_coeff = mo
         if mo_occ is not None:
             self.mo_occ = mo_occ
-        #dump_mo(self.mol, mo[:,:12])
         #if self.sorting == 'gau':
         #    mo = rearrange(mo, self.ncore, self.npair)
         #dump_mo(self.mol, mo[:,:12])
@@ -55,6 +54,7 @@ class PNOF():
             ncore = self.ncore
             npair = self.npair
             nact = npair*2
+        dump_mo(self.mol, mo[:,ncore:ncore+nact], ncol=10)
         #h_mo = h1e(self._hf, mo)
         h_mo = h1eff
         #J,K = self.ao2mo(mo)
@@ -63,6 +63,8 @@ class PNOF():
             guess = np.ones(self.npair)*0.9
             #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
             #guess = (np.arctan(np.arange(63.1, 0.0, -63/(self.npair-1)))+1)/2
+            if self.guess_scal is not None:
+                guess *= self.guess_scal
         else:
             guess = self.mo_occ[ncore:ncore+npair]
         ao_ovlp = self.mol.intor_symmetric('int1e_ovlp')
@@ -506,6 +508,7 @@ class fakeFCISolver():
         #casci.CASCI.__init__(self, mf_or_mol, ncas, nelecas)
         self.nof = None
         self.with_df = False
+        self.guess_scal = None
 
     def kernel(self, _scf, mo_coeff, mo_occ, h1eff, e_core, eri_cas, **kwargs):
         #eri_cas = self.get_h2eff()
@@ -516,6 +519,7 @@ class fakeFCISolver():
             thenof.npair = self.npair
             #thenof.sorting = self.sorting
             thenof.with_df = self.with_df
+            thenof.guess_scal = self.guess_scal
             e = thenof.kernel( h1eff, eri_cas, mo=mo_coeff, mo_occ=mo_occ)[0]
             self.nof = thenof
         else:
