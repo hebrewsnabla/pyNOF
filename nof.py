@@ -479,12 +479,12 @@ class SOPNOF(mc1step.CASSCF):
             if 'imicro' in envs:  # Within CASSCF iteration
                 if ss is None:
                     log.info('macro iter %d (%d JK  %d micro), '
-                             'CASSCF E = %.15g  dE = %.8g',
+                             'SOPNOF E = %.15g  dE = %.8g',
                              envs['imacro'], envs['njk'], envs['imicro'],
                              e_tot, e_tot-envs['elast'])
                 else:
                     log.info('macro iter %d (%d JK  %d micro), '
-                             'CASSCF E = %.15g  dE = %.8g  S^2 = %.7f',
+                             'SOPNOF E = %.15g  dE = %.8g  S^2 = %.7f',
                              envs['imacro'], envs['njk'], envs['imicro'],
                              e_tot, e_tot-envs['elast'], ss[0])
                 #if 'norm_gci' in envs and envs['norm_gci'] is not None:
@@ -497,9 +497,9 @@ class SOPNOF(mc1step.CASSCF):
                 #             envs['norm_gorb0'], envs['norm_ddm'], envs['max_offdiag_u'])
             else:  # Initialization step
                 if ss is None:
-                    log.info('CASCI E = %.15g', e_tot)
+                    log.info('SOPNOF E = %.15g', e_tot)
                 else:
-                    log.info('CASCI E = %.15g  S^2 = %.7f', e_tot, ss[0])
+                    log.info('SOPNOF E = %.15g  S^2 = %.7f', e_tot, ss[0])
         return e_tot, e_cas, None
 
 
@@ -507,7 +507,7 @@ class fakeFCISolver():
     def __init__(self):
         #casci.CASCI.__init__(self, mf_or_mol, ncas, nelecas)
         self.nof = None
-        self.with_df = False
+        #self.with_df = False
         self.guess_scal = None
 
     def kernel(self, _scf, mo_coeff, mo_occ, h1eff, e_core, eri_cas, **kwargs):
@@ -518,7 +518,7 @@ class fakeFCISolver():
             thenof.ncore = self.ncore
             thenof.npair = self.npair
             #thenof.sorting = self.sorting
-            thenof.with_df = self.with_df
+            #thenof.with_df = self.with_df
             thenof.guess_scal = self.guess_scal
             e = thenof.kernel( h1eff, eri_cas, mo=mo_coeff, mo_occ=mo_occ)[0]
             self.nof = thenof
