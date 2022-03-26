@@ -60,15 +60,16 @@ class PNOF():
         #J,K = self.ao2mo(mo)
         J,K = self.eri2jk(eri_cas)
         if self.mo_occ is None:
+            print('using default guess')
             guess = np.ones(self.npair)*0.9
             #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
             #guess = (np.arctan(np.arange(63.1, 0.0, -63/(self.npair-1)))+1)/2
             if self.guess_scal is not None:
                 guess *= self.guess_scal
         else:
+            print('using input mo_occ for guess')
             guess = self.mo_occ[ncore:ncore+npair]
-        ao_ovlp = self.mol.intor_symmetric('int1e_ovlp')
-        new_occ = get_occ(self, mo, ao_ovlp, self.ncore, self.npair, self.nopen, guess,
+        new_occ = get_occ(self, mo, self.ncore, self.npair, self.nopen, guess,
                           h_mo, J, K)
         print('intrinsic occ', new_occ[:ncore+nact])
         self.mo_occ = new_occ
@@ -82,28 +83,6 @@ class PNOF():
         
         self.Delta  = Delta
         self.Pi = Pi
-#        max_cyc_micro = 1
-#        while(True):
-#            njk = 0
-#            
-#            for imicro in range(max_cyc_micro):
-#                rota = rotate_orb_cc(self, mo, mo_occ, )
-#                u, g_orb, njk1, r0 = next(rota)
-#                rota.close()
-#                njk += njk1
-#                norm_t = np.linalg.norm(u - np.eye(nmo))
-#                norm_gorb = np.linalg.norm(g_orb)
-#                de = np.dot(pack_uniq_var(u, mo, ncore, npair), g_orb)
-#
-#                u = u.copy()
-#                g_orb = g_orb.copy()
-#                mo = rotate_mo(mo, u)
-#            mo_occ = get_occ(self, mo, ao_ovlp, self.ncore, self.npair, self.nopen, mo_occ[ncore:ncore+2*npair+nopen],
-#                          h_mo, J, K)
-#
-#
-        #get_grad(self, self.mo_occ, mo, h_mo, self.ncore, self.npair, self.nopen, Delta, Pi, J, K)
-#            break
         return e0, e_elec
         
     def ao2mo(self, mo=None):
@@ -177,7 +156,7 @@ def get_DP(f, ncore, npair, nopen):
     return Delta, Pi
 
 @timing
-def get_occ(nof, mo, ao_ovlp, ncore, npair, nopen, guess, h_mo, J, K):
+def get_occ(nof, mo, ncore, npair, nopen, guess, h_mo, J, K):
     new_occ = np.zeros(mo.shape[-1])
     new_occ[:ncore] = 1.0
     #guess = np.ones(npair)*0.99
