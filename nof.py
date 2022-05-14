@@ -527,4 +527,6 @@ class fakeFCISolver():
                 rdm2_aa[i,j,j,i] += b[ncore+i,ncore+j]
         rdm2 = 2*rdm2_aa
         return rdm1, rdm2
-        
+
+    def make_rdm1(self, ci,ncas, nelec):
+        return self.make_rdm12(ci, ncas, nelec)[0]
