@@ -45,12 +45,14 @@ def constrain(X, Xmin, Xmax):
 
 def qn_iter(X, getf, getE, t2N, N2t, maxstep=0.05, maxiter=25, debug=False):
     #Xmin, Xmax = Xrange
+    conv = False
     E = getE(X)
     f, hdiag = getf(X)
     print('cycle     maxq      dE      maxg')
     print("   0                       %.6f"% abs(f).max())
     if debug: print( 'X', X, 'f', f)
     if np.dot(f.T, f) < 1e-10 :
+        conv = True
         return X
     nx = len(X)
     oldE = E
@@ -129,13 +131,14 @@ def qn_iter(X, getf, getE, t2N, N2t, maxstep=0.05, maxiter=25, debug=False):
     
         if check_conv(f, q, dE):
             print("occ opt converged")
+            conv = True
             break
         else:
             cyc += 1
         if cyc > maxiter:
             print("conv not met")
             break
-    return X
+    return X, conv
 
 def check_conv(f, q, dE):
     normf = np.linalg.norm(f)

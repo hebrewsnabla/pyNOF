@@ -30,6 +30,8 @@ class PNOF():
             self.nopen = _hf.spin
         self.nmo = None
         self.with_df = False
+        self.gvbci_maxstep = 0.05
+        self.gvbci_maxiter = 35
         print('\n******** %s ********' % self.__class__)
 
     def kernel(self, h1eff, eri_cas, mo=None, mo_occ=None):
@@ -157,6 +159,8 @@ def get_DP(f, ncore, npair, nopen):
 
 @timing
 def get_occ(nof, mo, ncore, npair, nopen, guess, h_mo, J, K):
+    maxstep = nof.gvbci_maxstep
+    maxiter = nof.gvbci_maxiter
     new_occ = np.zeros(mo.shape[-1])
     new_occ[:ncore] = 1.0
     #guess = np.ones(npair)*0.99
@@ -181,11 +185,13 @@ def get_occ(nof, mo, ncore, npair, nopen, guess, h_mo, J, K):
         nact = npair*2+nopen
         return energy_elec(occ, ncore, nact, h_mo, J, K, Delta, Pi)
 
-    new_t = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t)
+    new_t, conv = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t, maxstep, maxiter)
     ci = t2X(new_t)
     print('ci', ci)
     new_occ = update_occ(ci, ncore, npair, nopen, len(new_occ))
     
+    if not conv:
+        raise RuntimeError('GVB ci fails to converge')
     return new_occ
 
 def t2X(t):
@@ -488,6 +494,8 @@ class fakeFCISolver():
         self.nof = None
         #self.with_df = False
         self.guess_scal = None
+        self.gvbci_maxstep = 0.05
+        self.gvbci_maxiter = 35
 
     def kernel(self, _scf, mo_coeff, mo_occ, h1eff, e_core, eri_cas, **kwargs):
         #eri_cas = self.get_h2eff()
@@ -499,6 +507,8 @@ class fakeFCISolver():
             #thenof.sorting = self.sorting
             #thenof.with_df = self.with_df
             thenof.guess_scal = self.guess_scal
+            thenof.gvbci_maxstep = self.gvbci_maxstep
+            thenof.gvbci_maxiter = self.gvbci_maxiter
             e = thenof.kernel( h1eff, eri_cas, mo=mo_coeff, mo_occ=mo_occ)[0]
             self.nof = thenof
         else:
