@@ -17,7 +17,6 @@ dump_mat.dump_mo(mf.mol, mf.mo_coeff)
 
 thenof = nof.SOPNOF(mf, npair*2, npair*2)
 thenof.verbose = 5
-#thenof.mo_occ = noon / 2
 thenof.fcisolver = nof.fakeFCISolver()
 thenof.fcisolver.ncore = ndb
 thenof.fcisolver.npair = npair

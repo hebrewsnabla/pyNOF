@@ -33,7 +33,6 @@ mf = loc_asrot(mf, nacto, nelecact, ncore)
 #exit()
 thenof = nof.SOPNOF(mf, nacto, nelecact).density_fit()
 thenof.verbose = 5
-#thenof.mo_occ = noon / 2
 thenof.fcisolver = nof.fakeFCISolver()
 thenof.fcisolver.ncore = ncore
 thenof.fcisolver.npair = nacto//2

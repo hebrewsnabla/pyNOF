@@ -15,7 +15,6 @@ mf, unos, noon, nacto, nelecact, ncore, _ = get_uno(mf, thresh=1.98)
 
 thenof = nof.SOPNOF(mf, nacto, nelecact)
 thenof.verbose = 5
-thenof.mo_occ = noon / 2
 thenof.fcisolver = nof.fakeFCISolver()
 thenof.fcisolver.ncore = ncore
 thenof.fcisolver.npair = nacto//2
