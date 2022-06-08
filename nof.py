@@ -41,7 +41,7 @@ class PNOF():
         else:
             self.mo_coeff = mo
         if mo_occ is not None:
-            self.mo_occ = mo_occ
+            self.mo_occ = mo_occ / 2.0
         #if self.sorting == 'gau':
         #    mo = rearrange(mo, self.ncore, self.npair)
         #dump_mo(self.mol, mo[:,:12])
@@ -474,6 +474,7 @@ class SOPNOF(mc1step.CASSCF):
         #print(eri_cas.shape, h1eff.shape)
         e_tot, e_cas = fnof.fcisolver.kernel(self._scf, mo_coeff, self.mo_occ, h1eff, e_core, eri_cas)
         #self.nof = thenof
+        self.mo_occ = fnof.fcisolver.mo_occ
         if envs is not None and log.verbose >= logger.INFO:
             log.debug('CAS space CI energy = %.15g', e_cas)
 
@@ -513,6 +514,7 @@ class fakeFCISolver():
     def __init__(self):
         #casci.CASCI.__init__(self, mf_or_mol, ncas, nelecas)
         self.nof = None
+        self.mo_occ = None
         #self.with_df = False
         self.guess_scal = None
         self.gvbci_maxstep = 0.05
@@ -536,6 +538,7 @@ class fakeFCISolver():
             self.nof = thenof
         else:
             e = self.nof.kernel( h1eff, eri_cas, mo=mo_coeff)[0]
+        self.mo_occ = self.nof.mo_occ*2.0
         e_cas = e 
         e_tot = e + e_core
         return e_tot, e_cas

@@ -53,7 +53,7 @@ def qn_iter(X, getf, getE, t2N, N2t, maxstep=0.05, maxiter=25, debug=False):
     if debug: print( 'X', X, 'f', f)
     if np.dot(f.T, f) < 1e-10 :
         conv = True
-        return X
+        return X, conv
     nx = len(X)
     oldE = E
     oldX = copy.copy(X)

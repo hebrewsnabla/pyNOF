@@ -32,10 +32,10 @@ print(ft_occ)
 
 thenof = nof.SOPNOF(mf, nacto, nelecact).density_fit()
 thenof.verbose = 4
-#thenof.mo_occ = occ       # you can provide init occ like np.array([1.0, 1.0, ..., 1.0, 
-                           #                                         0.9, 0.9, 0.51, 0.49, 0.1, 0.1, 
+#thenof.mo_occ = occ       # you can provide init occ like np.array([2.0, 2.0, ..., 2.0, 
+                           #                                         1.9, 1.9, 1.01, 0.99, 0.1, 0.1, 
                            #                                                      0.0, ..., 0.0])
-                           # Attention: the full occupation is 1.0, not 2.0, and the length of occ array is nmo, not nacto
+                           # Attention: the length of occ array is nmo, not nacto
 thenof.fcisolver = nof.fakeFCISolver()
 thenof.fcisolver.ncore = ncore
 thenof.fcisolver.npair = nacto//2
