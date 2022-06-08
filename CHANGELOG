@@ -1,0 +1,10 @@
+
+version 0.1.1 (Jun 08, 2022)
+* enable scipy optimizers for occupation optimization
+* provide mo_occ
+
+version 0.1 (Mar 24, 2022)
+* GVB, DF-GVB with 
+ - orbital optimizer: CIAH
+ - occupation optimizer: Murtagh-Sargent
+* generate GVB init guess with UNO/LMO by pyAutoMR
