@@ -32,6 +32,7 @@ class PNOF():
         self.with_df = False
         self.gvbci_maxstep = 0.05
         self.gvbci_maxiter = 35
+        self.optimizer = 'ms'
         print('\n******** %s ********' % self.__class__)
 
     def kernel(self, h1eff, eri_cas, mo=None, mo_occ=None):
@@ -56,7 +57,7 @@ class PNOF():
             ncore = self.ncore
             npair = self.npair
             nact = npair*2
-        dump_mo(self.mol, mo[:,ncore:ncore+nact], ncol=10)
+        #dump_mo(self.mol, mo[:,ncore:ncore+nact], ncol=10)
         #h_mo = h1e(self._hf, mo)
         h_mo = h1eff
         #J,K = self.ao2mo(mo)
@@ -177,15 +178,35 @@ def get_occ(nof, mo, ncore, npair, nopen, guess, h_mo, J, K):
         return occ
     def get_grad(t):
         X = t2X(t)
-        return get_ci_grad(nof, X, mo_act, npair, 0, h_mo, J, K)*np.sin(t)*np.cos(t)
+        f, hdiag = get_ci_grad(nof, X, mo_act, npair, 0, h_mo, J, K)
+        return f*np.sin(t)*np.cos(t), hdiag*(np.sin(t)*np.cos(t))**2
     def get_E(t):
         X = t2X(t)
         occ = update_occ(X, ncore, npair, nopen, len(new_occ))
         Delta, Pi = get_DP(occ, ncore, npair, nopen)
         nact = npair*2+nopen
         return energy_elec(occ, ncore, nact, h_mo, J, K, Delta, Pi)
-
-    new_t, conv = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t, maxstep, maxiter)
+    
+    if nof.optimizer == 'ms':
+        new_t, conv = qn_iter(X2t(guess), get_grad, get_E, t2X, X2t, maxstep, maxiter)
+    elif nof.optimizer in ['bfgs', 'l-bfgs-b']:
+        res = scipy.optimize.minimize(get_E, X2t(guess), method=nof.optimizer,
+                jac=lambda t: get_grad(t)[0], 
+                #hess=lambda t: np.diag(get_grad(t)[1]),
+                tol=1e-8,
+                options={'disp': True, 'gtol':1e-5, 'maxiter':maxiter})
+        new_t = res.x
+        conv = True
+    elif nof.optimizer in ['newton-cg', 'trust-ncg']:
+        res = scipy.optimize.minimize(get_E, X2t(guess), method=nof.optimizer,
+                jac=lambda t: get_grad(t)[0], 
+                hess=lambda t: np.diag(get_grad(t)[1]),
+                tol=1e-8,
+                options={'disp': True})
+        new_t = res.x
+        conv = True
+    else:
+        raise ValueError(' optimizer unsupported')
     ci = t2X(new_t)
     print('ci', ci)
     new_occ = update_occ(ci, ncore, npair, nopen, len(new_occ))
@@ -496,6 +517,7 @@ class fakeFCISolver():
         self.guess_scal = None
         self.gvbci_maxstep = 0.05
         self.gvbci_maxiter = 35
+        self.optimizer = 'ms'
 
     def kernel(self, _scf, mo_coeff, mo_occ, h1eff, e_core, eri_cas, **kwargs):
         #eri_cas = self.get_h2eff()
@@ -509,6 +531,7 @@ class fakeFCISolver():
             thenof.guess_scal = self.guess_scal
             thenof.gvbci_maxstep = self.gvbci_maxstep
             thenof.gvbci_maxiter = self.gvbci_maxiter
+            thenof.optimizer = self.optimizer
             e = thenof.kernel( h1eff, eri_cas, mo=mo_coeff, mo_occ=mo_occ)[0]
             self.nof = thenof
         else:
