@@ -6,6 +6,7 @@ from pyscf.soscf import ciah
 from pyscf.df.addons import DEFAULT_AUXBASIS
 import numpy as np
 import scipy
+import copy
 from automr.autocas import check_uno
 from automr.dump_mat import dump_mo
 from qnewton import qn_iter
@@ -35,7 +36,7 @@ class PNOF():
         self.optimizer = 'ms'
         print('\n******** %s ********' % self.__class__)
 
-    def kernel(self, h1eff, eri_cas, mo=None, mo_occ=None):
+    def kernel(self, h1eff, eri_cas, mo=None, mo_occ=None, iter_occ=True):
         if mo is None:
             mo = self.mo_coeff
         else:
@@ -62,21 +63,27 @@ class PNOF():
         h_mo = h1eff
         #J,K = self.ao2mo(mo)
         J,K = self.eri2jk(eri_cas)
-        if self.mo_occ is None:
-            print('using default guess')
-            guess = np.ones(self.npair)*0.9
-            #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
-            #guess = (np.arctan(np.arange(63.1, 0.0, -63/(self.npair-1)))+1)/2
-            if self.guess_scal is not None:
-                guess *= self.guess_scal
+        if iter_occ:
+            if self.mo_occ is None:
+                print('using default guess')
+                guess = np.ones(self.npair)*0.9
+                #guess = np.arange(0.96, 0.55, -0.4/(self.npair-1))
+                #guess = (np.arctan(np.arange(63.1, 0.0, -63/(self.npair-1)))+1)/2
+                if self.guess_scal is not None:
+                    guess *= self.guess_scal
+            else:
+                print('using input mo_occ for guess')
+                guess = self.mo_occ[ncore:ncore+npair]
+            new_occ = get_occ(self, mo, self.ncore, self.npair, self.nopen, guess,
+                              h_mo, J, K)
+            print('intrinsic occ', new_occ[:ncore+nact])
+            self.mo_occ = new_occ
+            #print('occ', self.mo_occ[:ncore+nact])
         else:
-            print('using input mo_occ for guess')
-            guess = self.mo_occ[ncore:ncore+npair]
-        new_occ = get_occ(self, mo, self.ncore, self.npair, self.nopen, guess,
-                          h_mo, J, K)
-        print('intrinsic occ', new_occ[:ncore+nact])
-        self.mo_occ = new_occ
-        #print('occ', self.mo_occ[:ncore+nact])
+            if self.mo_occ is None:
+                raise ValueError('no iter_occ required but mo_occ is not provided')
+            else:
+                print('warning: no iteration on mo_occ')
         Delta, Pi = get_DP(self.mo_occ, self.ncore, self.npair, self.nopen)
         
         e_elec = energy_elec(self.mo_occ, ncore, nact, h_mo, J, K, Delta, Pi)
@@ -460,15 +467,19 @@ class SOPNOF(mc1step.CASSCF):
         #self.ah_start_tol = 1e-8
         #self.max_stepsize = 1.5
         #self.ah_grad_trust_region = 1e6
-        
+
+    def h_casci(self, mo_coeff, eris=None):
+        fnof = mc1step._fake_h_for_fast_casci(self, mo_coeff, eris)
+
+        eri_cas = fnof.get_h2eff(mo_coeff)
+        h1eff, e_core = fnof.get_h1eff(mo_coeff)
+        return h1eff, e_core, eri_cas
+
     def casci(self, mo_coeff, ci0=None, eris=None, verbose=None, envs=None):
         #self._scf.mo_coeff = mo_coeff
         log = logger.new_logger(self, verbose)
-        if eris is None:
-            fnof = copy.copy(self)
-            fnof.ao2mo = self.get_h2cas
-        else:
-            fnof = mc1step._fake_h_for_fast_casci(self, mo_coeff, eris) 
+        
+        fnof = mc1step._fake_h_for_fast_casci(self, mo_coeff, eris) 
         eri_cas = fnof.get_h2eff(mo_coeff)
         h1eff, e_core = fnof.get_h1eff(mo_coeff)
         #print(eri_cas.shape, h1eff.shape)
